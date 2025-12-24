@@ -1,0 +1,15 @@
+[project]
+name = "data-hunter"
+version = "0.1.0"
+description = "AI Spy Agency Bot"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "aiogram>=3.17.0",
+    "beautifulsoup4>=4.12.3",
+    "google-genai>=0.2.2",
+    "openpyxl>=3.1.2",
+    "pandas>=2.2.0",
+    "python-dotenv>=1.0.1",
+    "requests>=2.31.0",
+]

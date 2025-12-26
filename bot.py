@@ -1,38 +1,36 @@
 import asyncio
 import logging
 import os
+import sys
+from aiohttp import web
 from dotenv import load_dotenv
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from aiogram.enums import ParseMode
 
-# 1. Импортируем наши "Мозги" из соседнего файла
-# (Если подчеркивает красным - не бойтесь, при запуске сработает)
+# Импорт твоей логики
 from ai_spy import get_quotes, ai_analyze_raw
 
-# 2. Настройки
-logging.basicConfig(level=logging.INFO)
+# Логирование в консоль (важно для облака)
+logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 load_dotenv()
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
-# Проверка токена
 if not TOKEN:
     print("❌ ОШИБКА: Токен бота не найден в .env")
     exit()
 
-# Инициализация бота
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
 # --- КЛАВИАТУРА ---
-# Создаем красивую кнопку, чтобы клиенту не писать команды руками
 kb = ReplyKeyboardMarkup(
     keyboard=[[KeyboardButton(text="🕵️ Запустить сканирование")]],
     resize_keyboard=True
 )
 
-# --- ЛОГИКА БОТА ---
+# --- ЛОГИКА БОТА (ТВОЯ) ---
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
@@ -50,7 +48,6 @@ async def start_scan(message: types.Message):
     """Главная функция: Связь с AI"""
     status_msg = await message.answer("⏳ **Подключаюсь к спутникам...**\n_(Это займет 10-15 секунд)_", parse_mode=ParseMode.MARKDOWN)
 
-    # 1. Запускаем парсер (функция из ai_spy.py)
     quotes = get_quotes()
     if not quotes:
         await status_msg.edit_text("❌ Ошибка: Не удалось пробить защиту сайта.")
@@ -58,19 +55,15 @@ async def start_scan(message: types.Message):
 
     await status_msg.edit_text(f"✅ Найдено цитат: {len(quotes)}. \n🧠 **Отправляю в нейросеть Gemini...**")
 
-    # 2. Запускаем анализ (функция из ai_spy.py)
-    # Важно: это синхронная функция, в продакшене лучше делать асинхронно, но для теста сойдет
     report = ai_analyze_raw(quotes)
     
     if not report:
         await status_msg.edit_text("⚠️ ИИ не ответил. Попробуйте еще раз.")
         return
 
-    # 3. Формируем красивый отчет прямо в чат
-    await status_msg.delete() # Удаляем сообщение "Загрузка"
+    await status_msg.delete() 
     
     for item in report:
-        # Красивая карточка для каждого инсайта
         card = (
             f"👤 **Автор:** {item.get('author', 'Неизвестен')}\n"
             f"🇷🇺 **Перевод:** {item.get('russian', 'Нет перевода')}\n"
@@ -82,10 +75,27 @@ async def start_scan(message: types.Message):
     
     await message.answer("💰 **Отчет готов!** С вас 5000 рублей. (Шутка, пока бесплатно).")
 
-# --- ЗАПУСК ---
+# --- ВЕБ-СЕРВЕР ДЛЯ HUGGING FACE (ОБЯЗАТЕЛЬНО) ---
+async def health_check(request):
+    return web.Response(text="I am alive. Bot is running!")
+
+async def start_web_server():
+    app = web.Application()
+    app.router.add_get('/', health_check)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    # Hugging Face слушает ТОЛЬКО порт 7860
+    site = web.TCPSite(runner, '0.0.0.0', 7860)
+    await site.start()
+
+# --- ЗАПУСК ВСЕГО ВМЕСТЕ ---
 async def main():
-    print("🚀 Бот запущен! Идите в Telegram.")
-    await dp.start_polling(bot)
+    print("🚀 Бот запускается в режиме Web + Polling...")
+    # Запускаем и сервер (чтобы не умереть), и бота (чтобы отвечать)
+    await asyncio.gather(
+        start_web_server(),
+        dp.start_polling(bot)
+    )
 
 if __name__ == "__main__":
     try:

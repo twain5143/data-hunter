@@ -1,23 +1,33 @@
-# 1. Берем полную версию Python (в ней есть DNS и сертификаты)
-FROM python:3.11
+# Используем легкий, но свежий Python
+FROM python:3.11-slim
 
-# 2. Создаем пользователя с ID 1000 (КРИТИЧНО ВАЖНО для доступа к сети)
+# 1. Устанавливаем системные утилиты для работы сети (DNS + HTTPS)
+# netbase - критически важен для разрешения адресов!
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    netbase \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# 2. Создаем пользователя 1000 (требование Hugging Face)
 RUN useradd -m -u 1000 user
 
-# 3. Создаем папку приложения и отдаем её пользователю
-WORKDIR /app
-
-# 4. Копируем зависимости
-COPY requirements.txt .
-
-# 5. Устанавливаем библиотеки (глобально, чтобы были доступны всем)
-RUN pip install --no-cache-dir -r requirements.txt
-
-# 6. Копируем код и сразу меняем владельца на 'user'
-COPY --chown=user . .
-
-# 7. Переключаемся на пользователя 1000 (Включает интернет)
+# 3. Переключаемся на пользователя. Дальше все действия только от него.
 USER user
 
-# 8. Запускаем
+# Настраиваем путь, чтобы Python видел библиотеки пользователя
+ENV PATH="/home/user/.local/bin:$PATH"
+
+# 4. Создаем рабочую папку прямо в доме пользователя
+WORKDIR /home/user/app
+
+# 5. Копируем файлы и СРАЗУ отдаем права пользователю
+COPY --chown=user requirements.txt .
+COPY --chown=user . .
+
+# 6. Устанавливаем библиотеки в папку пользователя (флаг --user)
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir --user -r requirements.txt
+
+# 7. Запускаем
 CMD ["python", "bot.py"]

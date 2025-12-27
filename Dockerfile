@@ -1,28 +1,24 @@
-# ОТКАТ НА 3.10 (Решает проблему DNS)
-FROM python:3.10-slim
+# ИСПОЛЬЗУЕМ ПОЛНУЮ ВЕРСИЮ DEBIAN (НЕ SLIM)
+# Это включает полные библиотеки glibc и DNS, которые нужны aiohttp
+FROM python:3.10
 
-# 1. Устанавливаем системные утилиты
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends netbase ca-certificates && \
-    rm -rf /var/lib/apt/lists/*
-
-# 2. Создаем пользователя
+# 1. Создаем пользователя (требование Hugging Face)
 RUN useradd -m -u 1000 user
 
-# 3. Настраиваем окружение
+# 2. Настраиваем окружение
 USER user
 ENV HOME=/home/user \
     PATH=/home/user/.local/bin:$PATH
 
-# 4. Рабочая папка
+# 3. Рабочая папка внутри дома пользователя
 WORKDIR $HOME/app
 
-# 5. Копируем и устанавливаем (сначала requirements для кэша)
+# 4. Копируем и ставим зависимости (от имени пользователя)
 COPY --chown=user requirements.txt .
 RUN pip install --no-cache-dir --user -r requirements.txt
 
-# 6. Копируем код
+# 5. Копируем код
 COPY --chown=user . .
 
-# 7. Запуск
+# 6. Запуск
 CMD ["python", "bot.py"]

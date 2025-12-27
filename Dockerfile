@@ -1,27 +1,28 @@
-FROM python:3.11-slim
+# ОТКАТ НА 3.10 (Решает проблему DNS)
+FROM python:3.10-slim
 
-# Ставим netbase (для DNS) и сертификаты
+# 1. Устанавливаем системные утилиты
 RUN apt-get update && \
     apt-get install -y --no-install-recommends netbase ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
-# Создаем пользователя user (ID 1000) с домашней папкой
+# 2. Создаем пользователя
 RUN useradd -m -u 1000 user
 
-# Переключаемся на пользователя
+# 3. Настраиваем окружение
 USER user
 ENV HOME=/home/user \
     PATH=/home/user/.local/bin:$PATH
 
-# Рабочая папка внутри дома пользователя
+# 4. Рабочая папка
 WORKDIR $HOME/app
 
-# Копируем и ставим зависимости (с правами пользователя)
+# 5. Копируем и устанавливаем (сначала requirements для кэша)
 COPY --chown=user requirements.txt .
 RUN pip install --no-cache-dir --user -r requirements.txt
 
-# Копируем код
+# 6. Копируем код
 COPY --chown=user . .
 
-# Запуск
+# 7. Запуск
 CMD ["python", "bot.py"]

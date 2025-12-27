@@ -1,25 +1,20 @@
-FROM python:3.11-slim
+# Используем ПОЛНУЮ версию Python (Debian-based)
+# В ней есть все сетевые утилиты и DNS "из коробки"
+FROM python:3.11
 
-# 1. Устанавливаем сертификаты (чтобы https работал) и DNS-утилиты
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends ca-certificates netbase && \
-    rm -rf /var/lib/apt/lists/*
-
-# 2. Создаем пользователя с ID 1000 (Главное требование Hugging Face)
-RUN useradd -m -u 1000 user
-
-# 3. Настраиваем папку
+# Создаем рабочую папку
 WORKDIR /app
 
-# 4. Копируем зависимости и устанавливаем их
+# Копируем и устанавливаем зависимости
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 5. Копируем весь код и СРАЗУ отдаем права нашему пользователю
-COPY --chown=user . .
+# Копируем код
+COPY . .
 
-# 6. Переключаемся на пользователя (теперь мы не root)
-USER user
+# ВАЖНО: Даем полные права на папку для любого пользователя
+# (Hugging Face запускает бота под случайным ID, это спасет от ошибок доступа)
+RUN chmod -R 777 /app
 
-# 7. Запускаем
+# Запускаем
 CMD ["python", "bot.py"]

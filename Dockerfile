@@ -1,33 +1,27 @@
-# Используем легкий, но свежий Python
 FROM python:3.11-slim
 
-# 1. Устанавливаем системные утилиты для работы сети (DNS + HTTPS)
-# netbase - критически важен для разрешения адресов!
+# Ставим netbase (для DNS) и сертификаты
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-    netbase \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+    apt-get install -y --no-install-recommends netbase ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
 
-# 2. Создаем пользователя 1000 (требование Hugging Face)
+# Создаем пользователя user (ID 1000) с домашней папкой
 RUN useradd -m -u 1000 user
 
-# 3. Переключаемся на пользователя. Дальше все действия только от него.
+# Переключаемся на пользователя
 USER user
+ENV HOME=/home/user \
+    PATH=/home/user/.local/bin:$PATH
 
-# Настраиваем путь, чтобы Python видел библиотеки пользователя
-ENV PATH="/home/user/.local/bin:$PATH"
+# Рабочая папка внутри дома пользователя
+WORKDIR $HOME/app
 
-# 4. Создаем рабочую папку прямо в доме пользователя
-WORKDIR /home/user/app
-
-# 5. Копируем файлы и СРАЗУ отдаем права пользователю
+# Копируем и ставим зависимости (с правами пользователя)
 COPY --chown=user requirements.txt .
+RUN pip install --no-cache-dir --user -r requirements.txt
+
+# Копируем код
 COPY --chown=user . .
 
-# 6. Устанавливаем библиотеки в папку пользователя (флаг --user)
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir --user -r requirements.txt
-
-# 7. Запускаем
+# Запуск
 CMD ["python", "bot.py"]
